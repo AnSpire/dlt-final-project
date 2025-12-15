@@ -9,7 +9,11 @@ import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaf
 const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
 
-  const { data: resultsData, isLoading: resultsLoading, refetch } = useScaffoldReadContract({
+  const {
+    data: resultsData,
+    isLoading: resultsLoading,
+    refetch,
+  } = useScaffoldReadContract({
     contractName: "Voting",
     functionName: "getResults",
   });
@@ -22,8 +26,11 @@ const Home: NextPage = () => {
   const { data: lastVotedPoll } = useScaffoldReadContract({
     contractName: "Voting",
     functionName: "lastVotedPoll",
-    args: connectedAddress ? [connectedAddress] : undefined,
+    args: connectedAddress ? [connectedAddress] : ([undefined] as const),
     watch: true,
+    query: {
+      enabled: !!connectedAddress,
+    },
   });
 
   const { data: ownerAddress } = useScaffoldReadContract({
@@ -41,12 +48,7 @@ const Home: NextPage = () => {
 
   const poll = useMemo(() => {
     if (!resultsData) return null;
-    const [question, opts, counts, active] = resultsData as unknown as [
-      string,
-      string[],
-      bigint[],
-      boolean,
-    ];
+    const [question, opts, counts, active] = resultsData as unknown as [string, string[], bigint[], boolean];
     return {
       question,
       options: opts,
