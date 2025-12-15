@@ -1,78 +1,82 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0 <0.9.0;
 
-// Useful for debugging. Remove when deploying to a live network.
-import "hardhat/console.sol";
-
-// Use openzeppelin to inherit battle-tested implementations (ERC20, ERC721, etc)
-// import "@openzeppelin/contracts/access/Ownable.sol";
-
 /**
- * A smart contract that allows changing a state variable of the contract and tracking the changes
- * It also allows the owner to withdraw the Ether in the contract
- * @author BuidlGuidl
+ * Simple decentralized voting contract.
+ * The owner can create a poll, end it, and users can vote once per poll.
  */
 contract YourContract {
-    // State Variables
     address public immutable owner;
-    string public greeting = "Building Unstoppable Apps!!!";
-    bool public premium = false;
-    uint256 public totalCounter = 0;
-    mapping(address => uint) public userGreetingCounter;
 
-    // Events: a way to emit log statements from smart contract that can be listened to by external parties
-    event GreetingChange(address indexed greetingSetter, string newGreeting, bool premium, uint256 value);
+    string public question;
+    string[] public options;
+    bool public votingActive;
 
-    // Constructor: Called once on contract deployment
-    // Check packages/hardhat/deploy/00_deploy_your_contract.ts
+    uint256 public currentPollId;
+    mapping(address => uint256) public lastVotedPoll;
+    mapping(uint256 => uint256) private voteCounts;
+
+    event VotingCreated(string question, string[] options);
+    event Voted(address indexed voter, uint256 indexed option);
+    event VotingEnded();
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier whenActive() {
+        require(votingActive, "Voting not active");
+        _;
+    }
+
     constructor(address _owner) {
         owner = _owner;
     }
 
-    // Modifier: used to define a set of rules that must be met before or after a function is executed
-    // Check the withdraw() function
-    modifier isOwner() {
-        // msg.sender: predefined variable that represents address of the account that called the current function
-        require(msg.sender == owner, "Not the Owner");
-        _;
-    }
+    function createVoting(string memory _question, string[] memory _options) external onlyOwner {
+        require(!votingActive, "Voting already active");
+        require(bytes(_question).length > 0, "Question required");
+        require(_options.length >= 2, "At least two options required");
 
-    /**
-     * Function that allows anyone to change the state variable "greeting" of the contract and increase the counters
-     *
-     * @param _newGreeting (string memory) - new greeting to save on the contract
-     */
-    function setGreeting(string memory _newGreeting) public payable {
-        // Print data to the hardhat chain console. Remove when deploying to a live network.
-        console.log("Setting new greeting '%s' from %s", _newGreeting, msg.sender);
-
-        // Change state variables
-        greeting = _newGreeting;
-        totalCounter += 1;
-        userGreetingCounter[msg.sender] += 1;
-
-        // msg.value: built-in global variable that represents the amount of ether sent with the transaction
-        if (msg.value > 0) {
-            premium = true;
-        } else {
-            premium = false;
+        question = _question;
+        uint256 previousOptionsLength = options.length;
+        delete options;
+        for (uint256 i = 0; i < previousOptionsLength; i++) {
+            voteCounts[i] = 0;
+        }
+        for (uint256 i = 0; i < _options.length; i++) {
+            require(bytes(_options[i]).length > 0, "Empty option");
+            options.push(_options[i]);
+            voteCounts[i] = 0;
         }
 
-        // emit: keyword used to trigger an event
-        emit GreetingChange(msg.sender, _newGreeting, msg.value > 0, msg.value);
+        currentPollId += 1;
+        votingActive = true;
+
+        emit VotingCreated(_question, _options);
     }
 
-    /**
-     * Function that allows the owner to withdraw all the Ether in the contract
-     * The function can only be called by the owner of the contract as defined by the isOwner modifier
-     */
-    function withdraw() public isOwner {
-        (bool success, ) = owner.call{ value: address(this).balance }("");
-        require(success, "Failed to send Ether");
+    function vote(uint256 optionIndex) external whenActive {
+        require(lastVotedPoll[msg.sender] < currentPollId, "Already voted");
+        require(optionIndex < options.length, "Invalid option");
+
+        lastVotedPoll[msg.sender] = currentPollId;
+        voteCounts[optionIndex] += 1;
+
+        emit Voted(msg.sender, optionIndex);
     }
 
-    /**
-     * Function that allows the contract to receive ETH
-     */
-    receive() external payable {}
+    function endVoting() external onlyOwner whenActive {
+        votingActive = false;
+        emit VotingEnded();
+    }
+
+    function getResults() external view returns (string memory, string[] memory, uint256[] memory, bool) {
+        uint256[] memory counts = new uint256[](options.length);
+        for (uint256 i = 0; i < options.length; i++) {
+            counts[i] = voteCounts[i];
+        }
+        return (question, options, counts, votingActive);
+    }
 }

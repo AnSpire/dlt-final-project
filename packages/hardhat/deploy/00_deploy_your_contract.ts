@@ -34,7 +34,17 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
 
   // Get the deployed contract to interact with it after deploying.
   const yourContract = await hre.ethers.getContract<Contract>("YourContract", deployer);
-  console.log("👋 Initial greeting:", await yourContract.greeting());
+  const question = "Какой стек для web3 вы предпочитаете?";
+  const options = ["Scaffold-ETH 2", "Hardhat + Ethers", "Foundry", "Другой вариант"];
+
+  const active = await yourContract.votingActive();
+  if (!active) {
+    const tx = await yourContract.createVoting(question, options);
+    await tx.wait();
+  }
+
+  const results = await yourContract.getResults();
+  console.log("📊 Default voting created:", results[0], "with options", options);
 };
 
 export default deployYourContract;

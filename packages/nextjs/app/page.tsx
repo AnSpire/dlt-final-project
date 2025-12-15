@@ -1,79 +1,160 @@
 "use client";
 
-import Link from "next/link";
-import { Address } from "@scaffold-ui/components";
+import { useCallback, useMemo } from "react";
 import type { NextPage } from "next";
-import { hardhat } from "viem/chains";
 import { useAccount } from "wagmi";
-import { BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { useTargetNetwork } from "~~/hooks/scaffold-eth";
+import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
-  const { targetNetwork } = useTargetNetwork();
+
+  const { data: resultsData, isLoading: resultsLoading, refetch } = useScaffoldReadContract({
+    contractName: "YourContract",
+    functionName: "getResults",
+  });
+
+  const { data: pollId } = useScaffoldReadContract({
+    contractName: "YourContract",
+    functionName: "currentPollId",
+  });
+
+  const { data: lastVotedPoll } = useScaffoldReadContract({
+    contractName: "YourContract",
+    functionName: "lastVotedPoll",
+    args: connectedAddress ? [connectedAddress] : undefined,
+    watch: true,
+  });
+
+  const { data: ownerAddress } = useScaffoldReadContract({
+    contractName: "YourContract",
+    functionName: "owner",
+  });
+
+  const { writeContractAsync: voteAsync, isMining: voteMining } = useScaffoldWriteContract({
+    contractName: "YourContract",
+  });
+
+  const { writeContractAsync: endVotingAsync, isMining: endMining } = useScaffoldWriteContract({
+    contractName: "YourContract",
+  });
+
+  const poll = useMemo(() => {
+    if (!resultsData) return null;
+    const [question, opts, counts, active] = resultsData as unknown as [
+      string,
+      string[],
+      bigint[],
+      boolean,
+    ];
+    return {
+      question,
+      options: opts,
+      counts: counts.map(c => Number(c)),
+      active,
+    };
+  }, [resultsData]);
+
+  const hasVoted = useMemo(() => {
+    if (!pollId || !lastVotedPoll) return false;
+    return lastVotedPoll === pollId;
+  }, [pollId, lastVotedPoll]);
+
+  const totalVotes = poll?.counts.reduce((a, b) => a + b, 0) ?? 0;
+
+  const handleVote = useCallback(
+    async (index: number) => {
+      if (!poll?.active) return;
+      await voteAsync({
+        functionName: "vote",
+        args: [BigInt(index)],
+      });
+      await refetch();
+    },
+    [poll?.active, refetch, voteAsync],
+  );
+
+  const handleEndVoting = useCallback(async () => {
+    await endVotingAsync({ functionName: "endVoting" });
+    await refetch();
+  }, [endVotingAsync, refetch]);
+
+  const isOwner = ownerAddress && connectedAddress && ownerAddress.toLowerCase() === connectedAddress.toLowerCase();
 
   return (
-    <>
-      <div className="flex items-center flex-col grow pt-10">
-        <div className="px-5">
-          <h1 className="text-center">
-            <span className="block text-2xl mb-2">Welcome to</span>
-            <span className="block text-4xl font-bold">Scaffold-ETH 2</span>
-          </h1>
-          <div className="flex justify-center items-center space-x-2 flex-col">
-            <p className="my-2 font-medium">Connected Address:</p>
-            <Address
-              address={connectedAddress}
-              chain={targetNetwork}
-              blockExplorerAddressLink={
-                targetNetwork.id === hardhat.id ? `/blockexplorer/address/${connectedAddress}` : undefined
-              }
-            />
-          </div>
-          <p className="text-center text-lg">
-            Get started by editing{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              packages/nextjs/app/page.tsx
-            </code>
-          </p>
-          <p className="text-center text-lg">
-            Edit your smart contract{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              YourContract.sol
-            </code>{" "}
-            in{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              packages/hardhat/contracts
-            </code>
-          </p>
+    <div className="flex flex-col gap-6 py-10 px-4 md:px-10 max-w-5xl w-full mx-auto">
+      <div className="flex items-center justify-between gap-4 flex-col md:flex-row">
+        <div>
+          <p className="text-sm uppercase tracking-wide text-neutral">Web3 Demo</p>
+          <h1 className="text-3xl font-bold">Децентрализованное голосование</h1>
+          <p className="text-base text-secondary">Подключите кошелёк и выберите свой вариант.</p>
         </div>
+        <RainbowKitCustomConnectButton />
+      </div>
 
-        <div className="grow bg-base-300 w-full mt-16 px-8 py-12">
-          <div className="flex justify-center items-center gap-12 flex-col md:flex-row">
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <BugAntIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Tinker with your smart contract using the{" "}
-                <Link href="/debug" passHref className="link">
-                  Debug Contracts
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <MagnifyingGlassIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Explore your local transactions with the{" "}
-                <Link href="/blockexplorer" passHref className="link">
-                  Block Explorer
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
-          </div>
+      <div className="card bg-base-200 shadow-xl">
+        <div className="card-body">
+          {resultsLoading && <p>Загрузка данных голосования...</p>}
+          {!resultsLoading && poll && (
+            <>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-sm text-neutral">Вопрос</p>
+                  <h2 className="text-2xl font-semibold">{poll.question}</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`badge ${poll.active ? "badge-success" : "badge-ghost"}`}>
+                    {poll.active ? "Активно" : "Завершено"}
+                  </span>
+                  <span className="badge badge-outline">Голосов: {totalVotes}</span>
+                </div>
+              </div>
+
+              <div className="grid gap-4 mt-6">
+                {poll.options.map((option, idx) => {
+                  const votes = poll.counts[idx] ?? 0;
+                  const percent = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+                  return (
+                    <div key={option} className="p-4 rounded-xl bg-base-100 border border-base-300">
+                      <div className="flex justify-between items-center gap-3 flex-wrap">
+                        <div>
+                          <p className="text-lg font-medium">{option}</p>
+                          <p className="text-sm text-neutral">
+                            {votes} голосов {totalVotes > 0 && `(${percent}%)`}
+                          </p>
+                        </div>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleVote(idx)}
+                          disabled={!connectedAddress || !poll.active || hasVoted || voteMining}
+                        >
+                          {hasVoted ? "Уже проголосовали" : "Голосовать"}
+                        </button>
+                      </div>
+                      <div className="mt-3 h-2 w-full bg-base-300 rounded-full overflow-hidden">
+                        <div className="h-full bg-primary" style={{ width: `${percent}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-between items-center pt-4">
+                <p className="text-sm text-neutral">
+                  Статус: {poll.active ? "можно голосовать" : "голосование закрыто"}
+                </p>
+                {isOwner && poll.active && (
+                  <button className="btn btn-outline" onClick={handleEndVoting} disabled={endMining}>
+                    Завершить голосование
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+          {!resultsLoading && !poll && <p>Голосование не найдено. Запустите деплой или создайте опрос в контракте.</p>}
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

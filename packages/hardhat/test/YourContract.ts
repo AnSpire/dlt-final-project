@@ -1,28 +1,38 @@
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { YourContract } from "../typechain-types";
 
-describe("YourContract", function () {
-  // We define a fixture to reuse the same setup in every test.
+describe("Voting contract", function () {
+  async function deployVotingFixture() {
+    const [owner, voter1, voter2, voter3] = await ethers.getSigners();
+    const factory = await ethers.getContractFactory("YourContract");
+    const contract = (await factory.deploy(owner.address)) as YourContract;
+    await contract.waitForDeployment();
+    await contract.createVoting("Test question?", ["Option A", "Option B"]);
+    return { contract, owner, voter1, voter2, voter3 };
+  }
 
-  let yourContract: YourContract;
-  before(async () => {
-    const [owner] = await ethers.getSigners();
-    const yourContractFactory = await ethers.getContractFactory("YourContract");
-    yourContract = (await yourContractFactory.deploy(owner.address)) as YourContract;
-    await yourContract.waitForDeployment();
+  it("prevents double voting", async function () {
+    const { contract, voter1 } = await loadFixture(deployVotingFixture);
+    await contract.connect(voter1).vote(0);
+    await expect(contract.connect(voter1).vote(0)).to.be.revertedWith("Already voted");
   });
 
-  describe("Deployment", function () {
-    it("Should have the right message on deploy", async function () {
-      expect(await yourContract.greeting()).to.equal("Building Unstoppable Apps!!!");
-    });
+  it("prevents voting after the poll is ended", async function () {
+    const { contract, owner, voter1 } = await loadFixture(deployVotingFixture);
+    await contract.connect(owner).endVoting();
+    await expect(contract.connect(voter1).vote(0)).to.be.revertedWith("Voting not active");
+  });
 
-    it("Should allow setting a new message", async function () {
-      const newGreeting = "Learn Scaffold-ETH 2! :)";
+  it("counts votes correctly", async function () {
+    const { contract, voter1, voter2, voter3 } = await loadFixture(deployVotingFixture);
+    await contract.connect(voter1).vote(0);
+    await contract.connect(voter2).vote(1);
+    await contract.connect(voter3).vote(0);
 
-      await yourContract.setGreeting(newGreeting);
-      expect(await yourContract.greeting()).to.equal(newGreeting);
-    });
+    const [, , counts] = await contract.getResults();
+    expect(counts[0]).to.equal(2n);
+    expect(counts[1]).to.equal(1n);
   });
 });
