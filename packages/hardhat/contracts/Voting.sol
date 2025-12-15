@@ -5,7 +5,7 @@ pragma solidity >=0.8.0 <0.9.0;
  * Simple decentralized voting contract.
  * The owner can create a poll, end it, and users can vote once per poll.
  */
-contract YourContract {
+contract Voting {
     address public immutable owner;
 
     string public question;

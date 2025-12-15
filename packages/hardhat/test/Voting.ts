@@ -1,13 +1,13 @@
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { YourContract } from "../typechain-types";
+import { Voting } from "../typechain-types";
 
 describe("Voting contract", function () {
   async function deployVotingFixture() {
     const [owner, voter1, voter2, voter3] = await ethers.getSigners();
-    const factory = await ethers.getContractFactory("YourContract");
-    const contract = (await factory.deploy(owner.address)) as YourContract;
+    const factory = await ethers.getContractFactory("Voting");
+    const contract = (await factory.deploy(owner.address)) as Voting;
     await contract.waitForDeployment();
     await contract.createVoting("Test question?", ["Option A", "Option B"]);
     return { contract, owner, voter1, voter2, voter3 };

@@ -10,33 +10,33 @@ const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
 
   const { data: resultsData, isLoading: resultsLoading, refetch } = useScaffoldReadContract({
-    contractName: "YourContract",
+    contractName: "Voting",
     functionName: "getResults",
   });
 
   const { data: pollId } = useScaffoldReadContract({
-    contractName: "YourContract",
+    contractName: "Voting",
     functionName: "currentPollId",
   });
 
   const { data: lastVotedPoll } = useScaffoldReadContract({
-    contractName: "YourContract",
+    contractName: "Voting",
     functionName: "lastVotedPoll",
     args: connectedAddress ? [connectedAddress] : undefined,
     watch: true,
   });
 
   const { data: ownerAddress } = useScaffoldReadContract({
-    contractName: "YourContract",
+    contractName: "Voting",
     functionName: "owner",
   });
 
   const { writeContractAsync: voteAsync, isMining: voteMining } = useScaffoldWriteContract({
-    contractName: "YourContract",
+    contractName: "Voting",
   });
 
   const { writeContractAsync: endVotingAsync, isMining: endMining } = useScaffoldWriteContract({
-    contractName: "YourContract",
+    contractName: "Voting",
   });
 
   const poll = useMemo(() => {

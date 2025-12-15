@@ -20,7 +20,7 @@ export default defineConfig([
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/ban-ts-comment": "off",
-
+      "@typescript-eslint/triple-slash-reference": "off",
       "prettier/prettier": [
         "warn",
         {
@@ -29,4 +29,5 @@ export default defineConfig([
       ],
     },
   },
+	
 ]);
