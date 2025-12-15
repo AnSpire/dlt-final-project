@@ -2,6 +2,11 @@
 
 Учебный проект на базе Scaffold-ETH 2. Реализовано on-chain голосование с веб-интерфейсом: администратор создаёт опрос, пользователи голосуют один раз, владелец может завершить голосование, фронтенд показывает вопрос, варианты и результаты в реальном времени.
 
+
+<img width="1851" height="899" alt="image" src="https://github.com/user-attachments/assets/957b7be7-2af7-4be1-a46a-210e42d94a18" />
+<img width="1845" height="846" alt="image" src="https://github.com/user-attachments/assets/c35c4a10-aab4-4827-816f-ed260254a019" />
+
+
 ## Архитектура
 - **Смарт-контракт** `packages/hardhat/contracts/Voting.sol`  
   - Владелец (адрес из конструктора) создаёт опрос `createVoting(question, options)`.  
